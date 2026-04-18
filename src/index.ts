@@ -94,6 +94,18 @@ async function startHttpServer(specLoader: SpecLoader, authToken: string | undef
 
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
+  // Compat shim: OpenClaw's MCP client (as of 2026.4.14) doesn't send the
+  // spec-required `Accept: application/json, text/event-stream` header on
+  // streamable-http requests. Rewrite it here so the SDK's 406 check passes.
+  // Remove once OpenClaw ships a compliant client.
+  app.all("/mcp", (req: Request, _res: Response, next: NextFunction) => {
+    const accept = req.headers.accept ?? "";
+    if (!accept.includes("application/json") || !accept.includes("text/event-stream")) {
+      req.headers.accept = "application/json, text/event-stream";
+    }
+    next();
+  });
+
   app.all("/mcp", async (req: Request, res: Response) => {
     try {
       const sessionId = req.header("mcp-session-id");
